@@ -35,7 +35,9 @@ fi
 
 if [ -z "$(id -u minecraft)" ]
 then
-	useradd -r -s "/bin/false" minecraft
+	useradd --system --no-create-home --shell "/bin/false" minecraft
+	nobody_home=~nobody
+	usermod -d "$nobody_home" minecraft
 else
 	echo 'user "minecraft" already exists'
 fi
