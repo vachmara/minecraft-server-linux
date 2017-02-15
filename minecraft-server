@@ -1,0 +1,125 @@
+#!/bin/bash
+
+server_home="/var/minecraft"
+
+if [ "$1" == "run" ]
+then
+	if [[ "$EUID" -ne "$(id -u minecraft)" ]]
+	then
+		echo "minecraft-server may only be run by the \"minecraft\" user"
+		echo "try:"
+		echo "	sudo -u minecraft minecraft-server <args>..."
+		exit 1
+	fi
+
+	killing=false
+
+	function onkill
+	{
+		killing=true
+		if [ -n "$jpid" ]
+		then
+			echo "terminating java process $jpid"
+			kill -15 "$jpid"
+			if kill -0 "$jpid"
+			then
+				echo "jpid not successfully terminated. waiting 3 seconds"
+				sleep 3s
+				kill -9 "$jpid"
+			fi
+		fi
+	}
+
+	trap "onkill" SIGINT SIGTERM SIGQUIT
+
+	server_name="$2"
+	if [ -z "$server_name" ]
+	then
+		# run_id=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+		echo "No server name given. Exiting..."
+		exit 1
+	fi
+
+	if [ ! -d "$server_home/servers/$server_name" ]
+	then
+		echo "server \"$server_name\" does not exist. A new server will be created with this name"
+		mkdir -p "$server_home/servers/$server_name"
+	fi
+	chown -R minecraft:minecraft "$server_home/servers/$server_name"
+	if [ ! -f "$server_home/servers/$server_name/minecraft-server.jar" ]
+	then
+		cp "$server_home/latest.jar" "$server_home/servers/$server_name/minecraft-server.jar"
+	fi
+
+	cd "$server_home/servers/$server_name"
+	echo "$$" > "/tmp/.minecraft-server.$server_name"
+	while true
+	do
+		java -Xmx2048M -Xms1024M -jar minecraft-server.jar nogui &
+		jpid=$!
+		echo "$jpid" > "/tmp/.minecraft-server-java.$server_name"
+		wait $jpid
+		if $killing
+		then
+			echo "stopping server"
+			exit
+		else
+			# Update the EULA
+			eula_path="$server_home/servers/$server_name/eula.txt"
+			sed -i '/eula=false/c\eula=true' "$eula_path"
+		fi
+		echo "java exited unexpectedly. restarting in 3 seconds"
+		sleep 3s
+		echo "restarting java"
+	done
+elif [ "$1" == "update" ]
+then
+	if [[ "$EUID" -ne 0 ]] && [[ "$EUID" -ne "$(id -u minecraft)" ]]
+	then
+		echo "You must be \"root\" or \"minecraft\" to update the server"
+		exit 1
+	fi
+
+	server_name="$2"
+
+	# Get latest version number
+	version_manifest=$(wget -q -O - "https://launchermeta.mojang.com/mc/game/version_manifest.json")
+	version=$(echo "$version_manifest" | jq -r ".latest.release")
+	if [ -z "$version" ]
+	then
+		echo "Could not find the latest version. You may not be connected to the internet"
+		exit 1
+	fi
+	echo "latest version is $version"
+
+	# Download latest version jar
+	url="https://s3.amazonaws.com/Minecraft.Download/versions/$version/minecraft_server.$version.jar"
+	echo "downloading latest jar from $url"
+	wget "$url" -O "/tmp/minecraft-server.$version.jar" || rm -rf "/tmp/minecraft-server.$version.jar"
+	if [ ! -f "/tmp/minecraft-server.$version.jar" ]
+	then
+		echo "Unable to download new server jar"
+		exit 1
+	fi
+	echo "installing server jar..."
+
+	# install latest.jar and latest.version to server home
+	mv "/tmp/minecraft-server.$version.jar" "$server_home/latest.jar"
+	echo "$version" > "$server_home/latest.version"
+	chown minecraft:minecraft "$server_home/latest.jar"
+	chown minecraft:minecraft "$server_home/latest.version"
+
+	if [ -n "$server_name" ]
+	then
+		echo "updating server jar for \"$server_name\""
+		cp "$server_home/latest.jar" "$server_home/servers/$server_name/minecraft-server.jar"
+		chown minecraft:minecraft "$server_home/servers/$server_name/minecraft-server.jar"
+	fi
+elif [ -n "$1" ]
+then
+	echo "invalid command $1"
+	exit 1
+else
+	echo "you must enter a command"
+fi
+

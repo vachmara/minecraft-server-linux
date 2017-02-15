@@ -1,0 +1,95 @@
+#! /bin/bash
+# /etc/init.d/minecraft-server
+
+### BEGIN INIT INFO
+# Provides: Minecraft Server
+# Required-Start: $network $local_fs $remote_fs
+# Required-Stop: $network $local_fs $remote_fs
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: Minecraft Server Daemon
+# Description: Starts and stops the minecraft server
+### END INIT INFO
+
+server_name="default"
+server_home="/var/minecraft"
+
+mkdir -p "$server_home/servers/$server_name"
+chown -R minecraft:minecraft "$server_home"
+
+function start-server
+{
+	mpid=$(cat "/tmp/.minecraft-server.$server_name")
+	if kill -0 "$mpid"
+	then
+		echo "minecraft server is already running"
+		exit 0
+	fi
+	sudo -u minecraft minecraft-server run "$server_name" &
+	disown
+}
+
+function stop-server
+{
+	mpid=$(cat "/tmp/.minecraft-server.$server_name")
+	jpid=$(cat "/tmp/.minecraft-server-java.$server_name")
+	echo "killing minecraft-server process $mpid"
+	kill -2 "$mpid"
+	if kill -0 "$mpid"
+	then
+		sleep 3.5s
+		if kill -0 "$mpid"
+		then
+			kill -9 "$mpid"
+		fi
+		if kill -0 "$jpid"
+		then
+			kill -9 "$jpid"
+		fi
+	elif kill -0 "$jpid"
+	then
+		sleep 3.5s
+		if kill -0 "$jpid"
+		then
+			kill -9 "$jpid"
+		fi
+	fi
+}
+
+if [ "$1" == "start" ]
+then
+	start-server
+elif [ "$1" == "stop" ]
+then
+	stop-server
+elif [ "$1" == "restart" ]
+then
+	stop-server
+	start-server
+elif [ "$1" == "update" ]
+then
+	running=false
+	mpid=$(cat "/tmp/.minecraft-server.$server_name")
+	if kill -0 "$mpid" &> /dev/null
+	then
+		echo "stopping server..."
+		running=true
+		stop-server
+	fi
+
+	minecraft-server update "$server_name"
+	update_result=$?
+
+	if $running
+	then
+		echo "starting server again..."
+		start-server &> /dev/null
+	fi
+	exit $update_result
+elif [ -n "$1" ]
+then
+	echo "invalid command $1"
+else
+	echo "you must enter a command"
+fi
+
