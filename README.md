@@ -1,5 +1,5 @@
-# minecraft-server-linux
-Simple install script and service for running a minecraft server on linux
+# Minecraft Server for Linux
+This repo provides scripts to simplify installing and running a minecraft server on Linux
 
 ## Installing
 ```` bash
