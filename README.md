@@ -10,7 +10,7 @@ cd minecraft-server-linux
 This will install the minecraft-server service and the minecraft-server script
 
 ## Usage
-The server files for the minecraft-server service will be stored in ````/var/minecraft/servers/default````.
+Server files will be stored in ````/var/minecraft/servers/default````.
 They aren't created until the first time you start the server.
 
 To start running your minecraft server:
