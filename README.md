@@ -5,7 +5,7 @@ This repo provides scripts to simplify installing and running a minecraft server
 ```` bash
 git clone https://github.com/lufinkey/minecraft-server-linux
 cd minecraft-server-linux
-./install.sh
+sudo ./install.sh
 ````
 This will install the minecraft-server service and the minecraft-server script
 
