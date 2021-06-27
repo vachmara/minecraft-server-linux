@@ -33,5 +33,5 @@ Update server to Spigot / Crafbukkit version:
 ```` bash
 sudo ./minecraft-server run your_server_name bukkit
 ````
-If you want change the default server running through minecraft-server service. Change `server_name="your_server_name"` variable available [here](https://github.com/vachmara/minecraft-server-install/blob/345128b501ca6e3bffe4ef974c62368ebc32f753/minecraft-server.service#L14).
+If you want change the default server running through minecraft-server service. Change `server_name="your_server_name"` variable available [here](https://github.com/vachmara/minecraft-server-linux/blob/df83419163e16dca5bd86ad7304717ee13700263/minecraft-server.service#L14).
 In case you have multiple servers running, don't forget to update `server.properties` port in your minecraft server files.
