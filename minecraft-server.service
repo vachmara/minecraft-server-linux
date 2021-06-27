@@ -11,7 +11,7 @@
 # Description: Starts and stops the minecraft server
 ### END INIT INFO
 
-server_name="default"
+server_name="Terter"
 server_home="/var/minecraft"
 
 mkdir -p "$server_home/servers/$server_name"

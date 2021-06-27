@@ -53,6 +53,7 @@ then
 
 	cd "$server_home/servers/$server_name"
 	echo "$$" > "/tmp/.minecraft-server.$server_name"
+
 	while true
 	do
 		java -Xmx2048M -Xms1024M -jar minecraft-server.jar nogui &
@@ -85,41 +86,94 @@ then
 	# Get latest version number
 	version_manifest=$(wget -q -O - "https://launchermeta.mojang.com/mc/game/version_manifest.json")
 	version=$(echo "$version_manifest" | jq -r ".latest.release")
+	
 	if [ -z "$version" ]
 	then
 		echo "Could not find the latest version. You may not be connected to the internet"
 		exit 1
 	fi
-	echo "latest version is $version"
+	echo "latest original minecraft version is $version"
 
-	# Download latest version jar
-	url="https://s3.amazonaws.com/Minecraft.Download/versions/$version/minecraft_server.$version.jar"
+	if [ ! -d "/tmp/minecraft" ]
+	then 
+		echo "/tmp/minecraft does not exist. Creating reposoritory ..."
+		mkdir -p "/tmp/minecraft/"
+	fi
+
+	if [ "$3" == "bukkit" ] || [ "$2" == "bukkit" ]
+	then
+		# Download latest bukkit version jar*
+		url="https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"	
+	else 
+		# Download latest minecraft version jar
+		manifest_url=$(curl -s "https://launchermeta.mojang.com/mc/game/version_manifest.json" | python3 -c $'import json,sys\nobj=json.load(sys.stdin)\nprint([ v for v in obj["versions"] if v["type"] == "release" ][0]["url"])')
+	    echo "fetch latest download url from $manifest_url"
+		url=$(curl -s $manifest_url | python3 -c $'import json,sys,base64\nobj=json.load(sys.stdin)\nprint(obj["downloads"]["server"]["url"])')
+	fi
 	echo "downloading latest jar from $url"
-	wget "$url" -O "/tmp/minecraft-server.$version.jar" || rm -rf "/tmp/minecraft-server.$version.jar"
-	if [ ! -f "/tmp/minecraft-server.$version.jar" ]
+	wget "$url" -O "/tmp/minecraft/minecraft-server.jar" || rm -rf "/tmp/minecraft/minecraft-server.jar"
+	
+	if [ ! -f "/tmp/minecraft/minecraft-server.jar" ]
 	then
 		echo "Unable to download new server jar"
 		exit 1
 	fi
-	echo "installing server jar..."
 
-	# install latest.jar and latest.version to server home
-	mv "/tmp/minecraft-server.$version.jar" "$server_home/latest.jar"
-	echo "$version" > "$server_home/latest.version"
+	echo "installing server jar..."
+	
+	if [ "$3" == "bukkit" ] || [ "$2" == "bukkit" ]
+	then
+		cd "/tmp/minecraft/"
+
+		git config --global --unset core.autocrlf
+		java -jar "minecraft-server.jar" --rev latest
+
+		file_name=$(python3 -c $'import os, re\nprint(os.getcwd() + "/" + [ f  for f in os.listdir(os.getcwd()) if(re.search( ".*spigot-([0-9]|.){5,10}.jar", f)) ][0])')
+ 		version=$(python3 -c $'import re, os\nprint(re.search("([0-9]|.){6}.jar", [ f  for f in os.listdir(os.getcwd()) if(re.search( ".*spigot-([0-9]|.){5,10}.jar", f)) ][0]).group(0)[:-4])')
+ 		latest_version="Bukkit $version"	
+		
+		if [ ! -f "$file_name" ]
+		then
+			echo "File name is wrong "
+			exit 1
+		fi
+		
+		# install latest.jar and latest.version to server home
+		mv "$file_name" "$server_home/latest.jar"
+
+	else
+		latest_version="Original $version"
+		
+		# install latest.jar and latest.version to server home
+		mv "/tmp/minecraft/minecraft-server.jar" "$server_home/latest.jar"
+	fi 	
+
+	#rm -r "/tmp/minecraft/"
+
+	echo "$latest_version" > "$server_home/latest.version"
 	chown minecraft:minecraft "$server_home/latest.jar"
 	chown minecraft:minecraft "$server_home/latest.version"
 
-	if [ -n "$server_name" ]
+	if [ -n "$server_name" ] && [ "$server_name" != "bukkit" ]
 	then
 		echo "updating server jar for \"$server_name\""
+
+		if [ ! -d "$server_home/servers/$server_name" ]
+		then
+			mkdir -p "$server_home/servers/$server_name"
+			echo "eula=true" > "$server_home/servers/$server_name/eula.txt"
+		fi 	
+		
 		cp "$server_home/latest.jar" "$server_home/servers/$server_name/minecraft-server.jar"
 		chown minecraft:minecraft "$server_home/servers/$server_name/minecraft-server.jar"
 	fi
 elif [ -n "$1" ]
 then
-	echo "invalid command $1"
+	echo "Please use one of these following commands :"
+	echo "	- minecraft-server run (server_name)"
+	echo "	- minecraft-server update (server_name) (bukkit)"
 	exit 1
 else
-	echo "you must enter a command"
+	echo "Command is required"
 fi
 

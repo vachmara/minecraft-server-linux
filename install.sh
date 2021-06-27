@@ -49,7 +49,12 @@ chmod +x "/etc/init.d/minecraft-server"
 chmod +x "/usr/local/bin/minecraft-server"
 chown -R minecraft:minecraft "$server_home"
 
-minecraft-server update
+if [ "$1" == "bukkit" ]
+then 
+	minecraft-server update bukkit
+else 
+	minecraft-server update
+fi	
 
 update-rc.d minecraft-server defaults
 
