@@ -8,7 +8,7 @@ cd minecraft-server-linux
 sudo ./install.sh
 ````
 This will install the minecraft-server service and the minecraft-server script with official minecraft version.
-To install Spigot version please run this command instead the last one:
+To install Spigot version please run this command instead of the last one:
 
 ```` bash
 sudo ./install.sh bukkit
